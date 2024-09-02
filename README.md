@@ -4,7 +4,7 @@ Fasthull
 Produces a simple procedural boat hull with the desired dimensions,
 including color-layered armor.
 
-![Example](img/example.png)
+![Example](img/example2.png)
 
 Prerequisites
 -------------
@@ -15,6 +15,8 @@ Usage
 -----
 ```
 usage: generate.py [-h]
+                   [--bow-type {rake|plumb|blunt}]
+                   [--tws n] [--tw n] [--tws n] [--tw n] [...]
                    donor_blueprint output_blueprint width height length
                    {1,2,3,4} side_armor deck_armor bottom_armor
 
@@ -32,7 +34,10 @@ positional arguments:
   bottom_armor      Number of _additional_ bottom armor layers.
 
 options:
-  -h, --help        show this help message and exit
+  -h, --help        show a help message
+  --bow-type        generate this type of bow
+  --tws             add this many blocks of space before the next turret well
+  --tw              add a turret well with this interior radius
 
 ```
 
@@ -52,6 +57,39 @@ produces a hull with following properties:
 
 Additional armor layers are colored by layer and can be replaced with armor
 refit tool or script.
+
+Bow shapes
+----------
+* rake: slopes upward from the keel and inward from the sides
+* plumb: slopes inward from the sides only, vertical forward edge
+* blunt: flat forward surface
+
+Turret wells
+------------
+To automatically bore turret wells:
+
+* Add a `--tws` to specify the spacing between the front of the main
+cuboid and the first turret well. You must specify this even if 0.
+* Add a `--tw` to specify the first turret well's interior radius.
+* The generator will create a square well of the specified radius and
+encase with 1 layer blocks color 31 between the deck level and the
+ventral level. It will also replace the topmost deck armor with a layer
+of blocks color 29, leaving a hole of radius 1 or 2 (depending on
+radius) through which to send interior turret structure.
+* Add another `--tws` to specify the spacing to next turret well.
+* Add another `--tw` to specify the second turret well's interior
+radius.
+* etc.
+
+Tool does not elevate turret wells automatically (you must do this
+yourself). Turret wells that would extend beyond the main cuboid will not be
+placed.
+
+```
+python3 generate.py path/to/donor.blueprint path/to/target.blueprint 11 7 60 2 3 1 1 --tws 5 --tw 3 --tws 3 --tw 3
+```
+adds a couple of turret wells to the first example, with additional spacing
+before the first well.
 
 License
 -------

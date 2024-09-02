@@ -67,6 +67,186 @@ def place_block(blueprint, v, bid, rot = 0, color = 0):
     blueprint["Blueprint"]["TotalBlockCount"] += 1
     blueprint["Blueprint"]["AliveCount"] += 1
 
+def do_bow_rake(target_width, target_length, target_height, donor_blueprint, voxel_depths, bottom_armor, side_armor, deck_armor, slope):
+    w = target_width
+    w_min_limit = -math.floor(w/2)
+    w_max_limit = math.floor(w/2)
+    w_min = w_min_limit
+    w_max = w_max_limit
+    z = target_length
+    y = 0
+
+    z_stride = slope
+    inverted_block, triangle_block, slope_block = {
+        1: (inverted_ids[1], corner_ids[1], slope_ids[1]),
+        2: (inverted_ids[2], corner_ids[2], slope_ids[2]),
+        3: (inverted_ids[3], corner_ids[3], slope_ids[3]),
+        4: (inverted_ids[4], corner_ids[4], slope_ids[4]),
+    }[max(min(z_stride, 4), 1)]
+
+    while w_min <= w_max:
+        for dz in range(z_stride + 1):
+            for x in range(w_min, w_max + 1):
+                voxel_depths[(x, y, z - 1 + dz)] = 1
+                for dy in range(bottom_armor):
+                    if (x, dy + 1, z - 1 + dz) not in voxel_depths:
+                        voxel_depths[(x, dy + 1, z - 1 + dz)] = 2 + dy
+        z += z_stride
+        w_min += 1
+        w_max -= 1
+
+    front_cursor = z - z_stride
+    w_min -= 1
+    w_max += 1
+    w_min_start = w_min
+    w_max_start = w_max
+
+    while y < target_height - 1:
+        w_min, w_max = w_min_start, w_max_start
+        z = front_cursor
+        place_block(donor_blueprint, (w_min - 1, y, z + z_stride), triangle_block, 12, 0)
+        place_block(donor_blueprint, (w_max + 1, y, z + z_stride), triangle_block, 16, 0)
+        place_block(donor_blueprint, (w_min, y, z + z_stride), slope_block, 12, 0)
+        if w_min != w_max:
+            place_block(donor_blueprint, (w_max, y, z + z_stride), slope_block, 12, 0)
+        while z >= target_length:
+            if w_min - 1 >= w_min_limit:
+                place_block(donor_blueprint, (w_min - 1, y, z), inverted_block, 12, 0)
+            if w_max + 1 <= w_max_limit:
+                place_block(donor_blueprint, (w_max + 1, y, z), inverted_block, 16, 0)
+            if w_min - 2 >= w_min_limit:
+                place_block(donor_blueprint, (w_min - 2, y, z), triangle_block, 12, 0)
+            if w_max + 2 <= w_max_limit:
+                place_block(donor_blueprint, (w_max + 2, y, z), triangle_block, 16, 0)
+            for dz in range(z_stride + 1):
+                voxel_depths[(w_min, y, z - 1 + dz)] = 1
+                voxel_depths[(w_max, y, z - 1 + dz)] = 1
+                for dx in range(min(side_armor, (w_max - w_min) // 2)):
+                    if (w_min + dx + 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] > 2 + dx:
+                        voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] = 2 + dx
+                    if (w_max - dx - 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] > 2 + dx:
+                        voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] = 2 + dx
+            w_min = max(w_min - 1, w_min_limit)
+            w_max = min(w_max + 1, w_max_limit)
+            z -= z_stride
+        front_cursor += z_stride
+        y += 1
+
+    w_min, w_max = w_min_start, w_max_start
+    z = front_cursor
+    place_block(donor_blueprint, (w_min - 1, y, z + z_stride), triangle_block, 12, 0)
+    place_block(donor_blueprint, (w_max + 1, y, z + z_stride), triangle_block, 16, 0)
+    place_block(donor_blueprint, (w_min, y, z + z_stride), slope_block, 12, 0)
+    if w_min != w_max:
+        place_block(donor_blueprint, (w_max, y, z + z_stride), slope_block, 12, 0)
+    while z >= target_length:
+        if w_min - 1 >= w_min_limit:
+            place_block(donor_blueprint, (w_min - 1, y, z), inverted_block, 12, 0)
+        if w_max + 1 <= w_max_limit:
+            place_block(donor_blueprint, (w_max + 1, y, z), inverted_block, 16, 0)
+        if w_min - 2 >= w_min_limit:
+            place_block(donor_blueprint, (w_min - 2, y, z), triangle_block, 12, 0)
+        if w_max + 2 <= w_max_limit:
+            place_block(donor_blueprint, (w_max + 2, y, z), triangle_block, 16, 0)
+        for dz in range(z_stride + 1):
+            for x in range(w_min, w_max + 1):
+                voxel_depths[(x, y, z - 1 + dz)] = 1
+                if x > w_min + 1 and x < w_max - 1:
+                    for dy in range(deck_armor):
+                        if (x, y - 1 - dy, z - 1 + dz) not in voxel_depths:
+                            voxel_depths[(x, y - 1 - dy, z - 1 + dz)] = 2 + dy
+        w_min = max(w_min - 1, w_min_limit)
+        w_max = min(w_max + 1, w_max_limit)
+        z -= z_stride
+
+def do_bow_plumb(target_width, target_length, target_height, donor_blueprint, voxel_depths, bottom_armor, side_armor, deck_armor, slope):
+    w = target_width
+    w_min_limit = -math.floor(w/2)
+    w_max_limit = math.floor(w/2)
+    w_min = w_min_limit
+    w_max = w_max_limit
+    z = target_length
+    y = 0
+
+    z_stride = slope
+    inverted_block, triangle_block, slope_block = {
+        1: (inverted_ids[1], corner_ids[1], slope_ids[1]),
+        2: (inverted_ids[2], corner_ids[2], slope_ids[2]),
+        3: (inverted_ids[3], corner_ids[3], slope_ids[3]),
+        4: (inverted_ids[4], corner_ids[4], slope_ids[4]),
+    }[max(min(z_stride, 4), 1)]
+
+    while w_min <= w_max:
+        for dz in range(z_stride + 1):
+            for x in range(w_min, w_max + 1):
+                voxel_depths[(x, y, z - 1 + dz)] = 1
+                for dy in range(bottom_armor):
+                    if (x, dy + 1, z - 1 + dz) not in voxel_depths:
+                        voxel_depths[(x, dy + 1, z - 1 + dz)] = 2 + dy
+        z += z_stride
+        w_min += 1
+        w_max -= 1
+
+    front_cursor = z - z_stride
+    w_min -= 1
+    w_max += 1
+    w_min_start = w_min
+    w_max_start = w_max
+
+    while y < target_height - 1:
+        w_min, w_max = w_min_start, w_max_start
+        z = front_cursor
+        while z >= target_length:
+            if w_min - 1 >= w_min_limit:
+                place_block(donor_blueprint, (w_min - 1, y, z), slope_block, 18, 0)
+            if w_max + 1 <= w_max_limit:
+                place_block(donor_blueprint, (w_max + 1, y, z), slope_block, 16, 0)
+            for dz in range(z_stride + 1):
+                voxel_depths[(w_min, y, z - 1 + dz)] = 1
+                voxel_depths[(w_max, y, z - 1 + dz)] = 1
+                for dx in range(min(side_armor, (w_max - w_min) // 2)):
+                    if (w_min + dx + 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] > 2 + dx:
+                        voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] = 2 + dx
+                    if (w_max - dx - 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] > 2 + dx:
+                        voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] = 2 + dx
+            w_min = max(w_min - 1, w_min_limit)
+            w_max = min(w_max + 1, w_max_limit)
+            z -= z_stride
+        y += 1
+
+    w_min, w_max = w_min_start, w_max_start
+    z = front_cursor
+    while z >= target_length:
+        if w_min - 1 >= w_min_limit:
+            place_block(donor_blueprint, (w_min - 1, y, z), slope_block, 18, 0)
+        if w_max + 1 <= w_max_limit:
+            place_block(donor_blueprint, (w_max + 1, y, z), slope_block, 16, 0)
+        for dz in range(z_stride + 1):
+            for x in range(w_min, w_max + 1):
+                voxel_depths[(x, y, z - 1 + dz)] = 1
+                if x > w_min + 1 and x < w_max - 1:
+                    for dy in range(deck_armor):
+                        if (x, y - 1 - dy, z - 1 + dz) not in voxel_depths:
+                            voxel_depths[(x, y - 1 - dy, z - 1 + dz)] = 2 + dy
+        w_min = max(w_min - 1, w_min_limit)
+        w_max = min(w_max + 1, w_max_limit)
+        z -= z_stride
+
+def do_bow_blunt(target_width, target_length, target_height, donor_blueprint, voxel_depths, bottom_armor, side_armor, deck_armor, slope):
+    w = target_width
+    w_min_limit = -math.floor(w/2)
+    w_max_limit = math.floor(w/2)
+    w_min = w_min_limit
+    w_max = w_max_limit
+    z = target_length
+
+    for x in range(w_min_limit, w_max_limit + 1):
+        for y in range(0, target_height):
+            voxel_depths[(x, y, z)] = 1
+            for dz in range(side_armor):
+                if (x, y, z - 1 - dz) not in voxel_depths:
+                    voxel_depths[(x, y, z - 1 - dz)] = 2 + dz
+
 def main():
     ap = argparse.ArgumentParser(description="Generates a simple boat hull, copying the author tag from a donor blueprint.")
     ap.add_argument("donor_blueprint", type=str, help="The donor blueprint from which to copy the author tag.")
@@ -78,12 +258,18 @@ def main():
     ap.add_argument("side_armor", type=int, help="Number of _additional_ side armor layers.")
     ap.add_argument("deck_armor", type=int, help="Number of _additional_ deck armor layers.")
     ap.add_argument("bottom_armor", type=int, help="Number of _additional_ bottom armor layers.")
+    ap.add_argument("--bow-type", type=str, required=False, choices=['rake', 'plumb', 'blunt'], default='rake', help="Bow type to generate.")
+    ap.add_argument("--turret-well-space", "--tws", type=int, required=False, action="append", default=[], help="Additional space to add before the nth turret well.")
+    ap.add_argument("--turret-well", "--tw", type=int, required=False, action="append", default=[], help="Interior radius of the nth turret well.")
 
     args = ap.parse_args(sys.argv[1:])
 
     target_width = args.width + 2 + 2 * args.side_armor
     target_height = args.height + 2 + args.deck_armor + args.bottom_armor
     target_length = args.length + 1 + args.side_armor
+
+    if args.bow_type == 'blunt':
+        target_length = target_length + 1
 
     with open(args.donor_blueprint, mode="r") as donor_blueprint_file:
         donor_blueprint = json.load(donor_blueprint_file)
@@ -153,99 +339,17 @@ def main():
                     voxel_depths[(x, target_height - 2 - dy, z)] = 2 + dy
 
     # generate the bow
+    if args.bow_type == 'rake':
+        do_bow_rake(target_width, target_length, target_height, donor_blueprint, voxel_depths, args.bottom_armor, args.side_armor, args.deck_armor, args.slope)
+    elif args.bow_type == 'plumb':
+        do_bow_plumb(target_width, target_length, target_height, donor_blueprint, voxel_depths, args.bottom_armor, args.side_armor, args.deck_armor, args.slope)
+    elif args.bow_type == 'blunt':
+        do_bow_blunt(target_width, target_length, target_height, donor_blueprint, voxel_depths, args.bottom_armor, args.side_armor, args.deck_armor, args.slope)
+
+    # generate the stern
     w = target_width
     w_min_limit = -math.floor(w/2)
     w_max_limit = math.floor(w/2)
-    w_min = w_min_limit
-    w_max = w_max_limit
-    z = target_length
-    y = 0
-
-    z_stride = args.slope
-    inverted_block, triangle_block, slope_block = {
-        1: (inverted_ids[1], corner_ids[1], slope_ids[1]),
-        2: (inverted_ids[2], corner_ids[2], slope_ids[2]),
-        3: (inverted_ids[3], corner_ids[3], slope_ids[3]),
-        4: (inverted_ids[4], corner_ids[4], slope_ids[4]),
-    }[max(min(z_stride, 4), 1)]
-
-    while w_min <= w_max:
-        for dz in range(z_stride + 1):
-            for x in range(w_min, w_max + 1):
-                voxel_depths[(x, y, z - 1 + dz)] = 1
-                for dy in range(args.bottom_armor):
-                    if (x, dy + 1, z - 1 + dz) not in voxel_depths:
-                        voxel_depths[(x, dy + 1, z - 1 + dz)] = 2 + dy
-        z += z_stride
-        w_min += 1
-        w_max -= 1
-
-    front_cursor = z - z_stride
-    w_min -= 1
-    w_max += 1
-    w_min_start = w_min
-    w_max_start = w_max
-
-    while y < target_height - 1:
-        w_min, w_max = w_min_start, w_max_start
-        z = front_cursor
-        place_block(donor_blueprint, (w_min - 1, y, z + z_stride), triangle_block, 12, 0)
-        place_block(donor_blueprint, (w_max + 1, y, z + z_stride), triangle_block, 16, 0)
-        place_block(donor_blueprint, (w_min, y, z + z_stride), slope_block, 12, 0)
-        if w_min != w_max:
-            place_block(donor_blueprint, (w_max, y, z + z_stride), slope_block, 12, 0)
-        while z >= target_length:
-            if w_min - 1 >= w_min_limit:
-                place_block(donor_blueprint, (w_min - 1, y, z), inverted_block, 12, 0)
-            if w_max + 1 <= w_max_limit:
-                place_block(donor_blueprint, (w_max + 1, y, z), inverted_block, 16, 0)
-            if w_min - 2 >= w_min_limit:
-                place_block(donor_blueprint, (w_min - 2, y, z), triangle_block, 12, 0)
-            if w_max + 2 <= w_max_limit:
-                place_block(donor_blueprint, (w_max + 2, y, z), triangle_block, 16, 0)
-            for dz in range(z_stride + 1):
-                voxel_depths[(w_min, y, z - 1 + dz)] = 1
-                voxel_depths[(w_max, y, z - 1 + dz)] = 1
-                for dx in range(min(args.side_armor, (w_max - w_min) // 2)):
-                    if (w_min + dx + 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] > 2 + dx:
-                        voxel_depths[(w_min + dx + 1, y, z - 1 + dz)] = 2 + dx
-                    if (w_max - dx - 1, y, z - 1 + dz) not in voxel_depths or voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] > 2 + dx:
-                        voxel_depths[(w_max - dx - 1, y, z - 1 + dz)] = 2 + dx
-            w_min = max(w_min - 1, w_min_limit)
-            w_max = min(w_max + 1, w_max_limit)
-            z -= z_stride
-        front_cursor += z_stride
-        y += 1
-
-    w_min, w_max = w_min_start, w_max_start
-    z = front_cursor
-    place_block(donor_blueprint, (w_min - 1, y, z + z_stride), triangle_block, 12, 0)
-    place_block(donor_blueprint, (w_max + 1, y, z + z_stride), triangle_block, 16, 0)
-    place_block(donor_blueprint, (w_min, y, z + z_stride), slope_block, 12, 0)
-    if w_min != w_max:
-        place_block(donor_blueprint, (w_max, y, z + z_stride), slope_block, 12, 0)
-    while z >= target_length:
-        if w_min - 1 >= w_min_limit:
-            place_block(donor_blueprint, (w_min - 1, y, z), inverted_block, 12, 0)
-        if w_max + 1 <= w_max_limit:
-            place_block(donor_blueprint, (w_max + 1, y, z), inverted_block, 16, 0)
-        if w_min - 2 >= w_min_limit:
-            place_block(donor_blueprint, (w_min - 2, y, z), triangle_block, 12, 0)
-        if w_max + 2 <= w_max_limit:
-            place_block(donor_blueprint, (w_max + 2, y, z), triangle_block, 16, 0)
-        for dz in range(z_stride + 1):
-            for x in range(w_min, w_max + 1):
-                voxel_depths[(x, y, z - 1 + dz)] = 1
-                if x > w_min + 1 and x < w_max - 1:
-                    for dy in range(args.deck_armor):
-                        if (x, y - 1 - dy, z - 1 + dz) not in voxel_depths:
-                            voxel_depths[(x, y - 1 - dy, z - 1 + dz)] = 2 + dy
-        w_min = max(w_min - 1, w_min_limit)
-        w_max = min(w_max + 1, w_max_limit)
-        z -= z_stride
-
-    # generate the stern
-
     z = 0
     for x in range(w_min_limit, w_max_limit + 1):
         for y in range(0, target_height):
@@ -253,6 +357,44 @@ def main():
             for dz in range(args.side_armor):
                 if (x, y, z + 1 + dz) not in voxel_depths:
                     voxel_depths[(x, y, z + 1 + dz)] = 2 + dz
+
+    # bore turret wells
+    z = target_length
+    if args.turret_well_space and len(args.turret_well_space) > 0:
+        z = z - args.turret_well_space[0]
+    if args.turret_well:
+        for idx, well_radius in enumerate(args.turret_well):
+            z = z - well_radius - 1
+            if z - well_radius <= args.side_armor:
+                break
+            if well_radius > args.width / 2 + 1:
+                break
+
+            deck_pipe_radius = 1 if well_radius < 4 else 2
+
+            for _y in range(target_height):
+                if _y > args.bottom_armor:
+                    for _x in range(well_radius + 1):
+                        for _z in range(well_radius + 1):
+                            if _y < target_height - args.deck_armor - 1 and (_x == well_radius or _z == well_radius):
+                                voxel_depths[(_x, _y, z + _z)] = 31
+                                voxel_depths[(_x, _y, z - _z)] = 31
+                                voxel_depths[(-_x, _y, z + _z)] = 31
+                                voxel_depths[(-_x, _y, z - _z)] = 31
+                            elif _y < target_height - args.deck_armor - 1 or (_x < deck_pipe_radius and _z < deck_pipe_radius):
+                                voxel_depths[(_x, _y, z + _z)] = 0
+                                voxel_depths[(_x, _y, z - _z)] = 0
+                                voxel_depths[(-_x, _y, z + _z)] = 0
+                                voxel_depths[(-_x, _y, z - _z)] = 0
+                            elif _y == target_height - 1:
+                                voxel_depths[(_x, _y, z + _z)] = 29
+                                voxel_depths[(_x, _y, z - _z)] = 29
+                                voxel_depths[(-_x, _y, z + _z)] = 29
+                                voxel_depths[(-_x, _y, z - _z)] = 29
+
+            z = z - well_radius
+            if args.turret_well_space and idx + 1 < len(args.turret_well_space):
+                z = z - args.turret_well_space[idx + 1]
 
     # filter voxels by depth
     voxels_by_depth = {}
